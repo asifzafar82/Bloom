@@ -64,7 +64,7 @@ You are the friend at 2am who actually listens. That is your only job."""
         messages.append(msg)
 
     response = client.chat.completions.create(
-        model="llama3-8b-8192",
+        model="llama-3.3-70b-versatile",
         max_tokens=300,
         messages=messages
     )
