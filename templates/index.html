@@ -15,16 +15,18 @@
 </head>
 <body>
 
-    <!-- Welcome Overlay -->
-    <div class="welcome-overlay" id="welcomeOverlay">
+    <!-- Welcome Screen -->
+    <div id="welcomeScreen">
         <div class="welcome-box">
-            <h1>🌸 Bloom</h1>
+            <div class="welcome-logo">🌸</div>
+            <h1>Bloom</h1>
             <p class="welcome-tagline">You're not alone in this journey</p>
-            
+
             <div class="trust-badges">
-                <span>🔒 100% Private</span>
-                <span>💬 Real AI Conversation</span>
-                <span>🆓 Completely Free</span>
+                <span>🔒 Private</span>
+                <span>🆓 Free</span>
+                <span>💬 AI Support</span>
+                <span>🌸 Built for IVF</span>
             </div>
 
             <p class="welcome-desc">
@@ -32,15 +34,15 @@
             </p>
 
             <p class="welcome-desc">
-                Just tell me how you're feeling. No judgment. No advice unless you want it. Just someone who listens. 💕
+                Just tell me how you're feeling. No judgment. No advice unless you want it. Just someone who truly listens. 💕
             </p>
 
             <button class="start-btn" onclick="startChat()">I'm ready to talk 🌸</button>
         </div>
     </div>
 
-    <!-- Main App -->
-    <div class="main-app" id="mainApp" style="display:none">
+    <!-- Main Chat App -->
+    <div id="mainApp" style="display:none">
         <div class="header">
             <h1>🌸 Bloom</h1>
             <p>You're not alone in this journey</p>
@@ -84,7 +86,7 @@
                     Hi 🌸 I'm here for you. IVF is one of the hardest journeys anyone can go through. Tell me how you're feeling — I'm listening, no judgment.
                 </div>
                 <div class="message hint">
-                    💡 Try saying: "I'm so anxious about my results" or "I can't sleep during the two week wait"
+                    💡 Try: "I'm so anxious about my results" or "I can't sleep during the two week wait"
                 </div>
             </div>
             <div class="typing" id="typing" style="display:none">Typing...</div>
@@ -95,7 +97,6 @@
             </div>
         </div>
 
-        <!-- Feedback Section -->
         <div class="feedback-container" id="feedbackContainer" style="display:none">
             <p>Was Bloom helpful today? 💕</p>
             <div class="feedback-buttons">
@@ -111,4 +112,3 @@
     <script src="/static/app.js"></script>
 </body>
 </html>
-
