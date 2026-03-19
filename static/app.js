@@ -1,5 +1,11 @@
 let selectedMood = "";
 let conversationHistory = [];
+let messageCount = 0;
+
+function startChat() {
+    document.getElementById('welcomeScreen').style.display = 'none';
+    document.getElementById('mainApp').style.display = 'flex';
+}
 
 function selectMood(btn) {
     document.querySelectorAll('.mood-btn').forEach(b => b.classList.remove('selected'));
@@ -17,7 +23,6 @@ async function sendMessage() {
     input.value = '';
 
     conversationHistory.push({ role: "user", content: text });
-
     document.getElementById('typing').style.display = 'block';
 
     try {
@@ -38,6 +43,10 @@ async function sendMessage() {
         if (data.reply) {
             addMessage(data.reply, 'bot');
             conversationHistory.push({ role: "assistant", content: data.reply });
+            messageCount++;
+            if (messageCount >= 3) {
+                document.getElementById('feedbackContainer').style.display = 'block';
+            }
         }
     } catch (err) {
         document.getElementById('typing').style.display = 'none';
@@ -57,30 +66,9 @@ function addMessage(text, sender) {
 function sendFeedback(type) {
     document.querySelector('.feedback-buttons').style.display = 'none';
     document.getElementById('feedbackThanks').style.display = 'block';
-    
-    // Send feedback to server
     fetch('/feedback', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ feedback: type })
     });
 }
-
-// Show feedback after 3 messages
-let messageCount = 0;
-const originalAddMessage = addMessage;
-addMessage = function(text, sender) {
-    originalAddMessage(text, sender);
-    if (sender === 'bot') {
-        messageCount++;
-        if (messageCount >= 3) {
-            document.getElementById('feedbackContainer').style.display = 'block';
-        }
-    }
-}
-
-function startChat() {
-    document.getElementById('welcomeOverlay').style.display = 'none';
-    document.getElementById('mainApp').style.display = 'flex';
-}
-
