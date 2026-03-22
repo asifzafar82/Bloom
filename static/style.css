@@ -324,3 +324,210 @@ body {
     font-size: 14px;
     margin-top: 10px;
 }
+
+/* ===== TABS ===== */
+.tab-nav {
+    display: flex;
+    gap: 8px;
+    width: 100%;
+    max-width: 480px;
+    margin-bottom: 16px;
+    background: white;
+    border-radius: 16px;
+    padding: 8px;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+}
+
+.tab-btn {
+    flex: 1;
+    padding: 10px 4px;
+    border: none;
+    border-radius: 12px;
+    background: transparent;
+    color: #ad1457;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.tab-btn.active {
+    background: #e91e8c;
+    color: white;
+}
+
+.tab-content {
+    width: 100%;
+    max-width: 480px;
+}
+
+/* ===== EXERCISES ===== */
+.section-title {
+    color: #880e4f;
+    font-size: 18px;
+    font-weight: 700;
+    margin-bottom: 6px;
+}
+
+.section-desc {
+    color: #ad1457;
+    font-size: 13px;
+    margin-bottom: 16px;
+}
+
+.exercise-card {
+    background: white;
+    border-radius: 16px;
+    padding: 16px;
+    margin-bottom: 12px;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.08);
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.exercise-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(233,30,140,0.15);
+}
+
+.exercise-icon {
+    font-size: 32px;
+}
+
+.exercise-info h3 {
+    color: #880e4f;
+    font-size: 15px;
+    margin-bottom: 4px;
+}
+
+.exercise-info p {
+    color: #999;
+    font-size: 12px;
+}
+
+.exercise-player {
+    background: white;
+    border-radius: 20px;
+    padding: 24px;
+    margin-top: 16px;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+    text-align: center;
+}
+
+.exercise-step {
+    color: #333;
+    font-size: 16px;
+    line-height: 1.6;
+    margin-bottom: 16px;
+    min-height: 60px;
+}
+
+.exercise-timer {
+    color: #ad1457;
+    font-size: 13px;
+    margin-bottom: 16px;
+}
+
+.exercise-next-btn {
+    background: #e91e8c;
+    color: white;
+    border: none;
+    border-radius: 25px;
+    padding: 12px 32px;
+    font-size: 15px;
+    cursor: pointer;
+    margin-right: 8px;
+}
+
+.exercise-close-btn {
+    background: transparent;
+    color: #ad1457;
+    border: 2px solid #f48fb1;
+    border-radius: 25px;
+    padding: 12px 24px;
+    font-size: 15px;
+    cursor: pointer;
+}
+
+/* ===== AFFIRMATIONS ===== */
+.affirmation-card {
+    background: white;
+    border-radius: 20px;
+    padding: 32px 24px;
+    text-align: center;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+    margin-bottom: 16px;
+}
+
+.affirmation-text {
+    color: #880e4f;
+    font-size: 18px;
+    line-height: 1.6;
+    font-style: italic;
+    margin-bottom: 20px;
+    min-height: 80px;
+}
+
+.affirmation-btn {
+    background: #e91e8c;
+    color: white;
+    border: none;
+    border-radius: 25px;
+    padding: 12px 24px;
+    font-size: 14px;
+    cursor: pointer;
+}
+
+/* ===== JOURNAL ===== */
+.journal-prompt {
+    background: #fce4ec;
+    border-radius: 12px;
+    padding: 14px;
+    color: #880e4f;
+    font-size: 14px;
+    line-height: 1.5;
+    margin-bottom: 16px;
+    font-style: italic;
+}
+
+.journal-input {
+    width: 100%;
+    min-height: 200px;
+    padding: 16px;
+    border: 2px solid #f48fb1;
+    border-radius: 16px;
+    font-size: 14px;
+    line-height: 1.6;
+    color: #333;
+    background: white;
+    outline: none;
+    resize: vertical;
+    margin-bottom: 12px;
+    font-family: 'Segoe UI', sans-serif;
+}
+
+.journal-input:focus {
+    border-color: #e91e8c;
+}
+
+.journal-save-btn {
+    background: #e91e8c;
+    color: white;
+    border: none;
+    border-radius: 25px;
+    padding: 14px 32px;
+    font-size: 15px;
+    cursor: pointer;
+    width: 100%;
+}
+
+.journal-saved {
+    text-align: center;
+    color: #e91e8c;
+    font-size: 14px;
+    margin-top: 12px;
+    font-weight: 600;
+}
