@@ -1,23 +1,148 @@
-from flask import Flask, request, jsonify, render_template
+from flask import Flask, request, jsonify, render_template, render_template_string
 import os
 from groq import Groq
-from datetime import datetime
+from datetime import datetime, date
+import json
 
 app = Flask(__name__)
+app.secret_key = os.environ.get("SECRET_KEY", "bloom-secret-2026")
 
 client = Groq(api_key=os.environ.get("GROQ_API_KEY"))
 
-# Simple in-memory counter
+# Clinic codes — add new ones here anytime
+CLINIC_CODES = {
+    "BLOOM-AUS-001": {"clinic": "Sample Australian Clinic", "country": "Australia"},
+    "BLOOM-UK-001": {"clinic": "Sample UK Clinic", "country": "UK"},
+    "BLOOM-USA-001": {"clinic": "Sample US Clinic", "country": "USA"},
+    "BLOOM-IN-001": {"clinic": "Sample Indian Clinic", "country": "India"},
+}
+
+# In-memory stats
 stats = {
     "total_conversations": 0,
     "total_messages": 0,
     "helpful_feedback": 0,
-    "not_helpful_feedback": 0
+    "not_helpful_feedback": 0,
+    "clinic_users": 0,
+    "free_users": 0
 }
+
+# Clinic specific stats — tracks anonymous data per clinic code
+clinic_stats = {
+    "BLOOM-AUS-001": {"patients": 0, "messages": 0, "moods": {}, "stages": {}, "helpful": 0},
+    "BLOOM-UK-001": {"patients": 0, "messages": 0, "moods": {}, "stages": {}, "helpful": 0},
+    "BLOOM-USA-001": {"patients": 0, "messages": 0, "moods": {}, "stages": {}, "helpful": 0},
+    "BLOOM-IN-001": {"patients": 0, "messages": 0, "moods": {}, "stages": {}, "helpful": 0},
+}
+
+FREE_DAILY_LIMIT = 5
+
+CLINIC_DASHBOARD = """
+<!DOCTYPE html>
+<html>
+<head>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bloom — Clinic Dashboard</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: 'Segoe UI', sans-serif; background: #fce4ec; min-height: 100vh; padding: 20px; }
+        .header { text-align: center; margin-bottom: 24px; }
+        .header h1 { color: #880e4f; font-size: 28px; }
+        .header p { color: #ad1457; font-size: 14px; margin-top: 4px; }
+        .clinic-name { background: white; border-radius: 16px; padding: 16px; text-align: center; margin-bottom: 20px; box-shadow: 0 4px 15px rgba(0,0,0,0.08); }
+        .clinic-name h2 { color: #880e4f; font-size: 20px; }
+        .clinic-name p { color: #999; font-size: 13px; margin-top: 4px; }
+        .stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 20px; }
+        .stat-card { background: white; border-radius: 16px; padding: 20px; text-align: center; box-shadow: 0 4px 15px rgba(0,0,0,0.08); }
+        .stat-number { color: #e91e8c; font-size: 36px; font-weight: 700; }
+        .stat-label { color: #999; font-size: 12px; margin-top: 4px; }
+        .section { background: white; border-radius: 16px; padding: 16px; margin-bottom: 16px; box-shadow: 0 4px 15px rgba(0,0,0,0.08); }
+        .section h3 { color: #880e4f; font-size: 16px; margin-bottom: 12px; }
+        .bar-item { margin-bottom: 10px; }
+        .bar-label { color: #555; font-size: 13px; margin-bottom: 4px; display: flex; justify-content: space-between; }
+        .bar { background: #fce4ec; border-radius: 10px; height: 10px; }
+        .bar-fill { background: #e91e8c; border-radius: 10px; height: 10px; transition: width 0.5s; }
+        .privacy-note { text-align: center; color: #999; font-size: 12px; margin-top: 16px; }
+        .no-data { text-align: center; color: #ccc; font-size: 14px; padding: 20px; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🌸 Bloom Dashboard</h1>
+        <p>Anonymous patient insights</p>
+    </div>
+
+    <div class="clinic-name">
+        <h2>{{ clinic_name }}</h2>
+        <p>{{ country }} • Access Code: {{ code }}</p>
+    </div>
+
+    <div class="stats-grid">
+        <div class="stat-card">
+            <div class="stat-number">{{ data.patients }}</div>
+            <div class="stat-label">Total Patients</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-number">{{ data.messages }}</div>
+            <div class="stat-label">Messages Sent</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-number">{{ data.helpful }}</div>
+            <div class="stat-label">Helpful Ratings</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-number">{{ avg_messages }}</div>
+            <div class="stat-label">Avg Messages/Patient</div>
+        </div>
+    </div>
+
+    {% if data.moods %}
+    <div class="section">
+        <h3>💭 Most Common Moods</h3>
+        {% for mood, count in top_moods %}
+        <div class="bar-item">
+            <div class="bar-label"><span>{{ mood }}</span><span>{{ count }}</span></div>
+            <div class="bar"><div class="bar-fill" style="width: {{ (count / max_mood * 100)|int }}%"></div></div>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="section"><div class="no-data">No mood data yet 🌸</div></div>
+    {% endif %}
+
+    {% if data.stages %}
+    <div class="section">
+        <h3>📍 IVF Stages Most Supported</h3>
+        {% for stage, count in top_stages %}
+        <div class="bar-item">
+            <div class="bar-label"><span>{{ stage }}</span><span>{{ count }}</span></div>
+            <div class="bar"><div class="bar-fill" style="width: {{ (count / max_stage * 100)|int }}%"></div></div>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="section"><div class="no-data">No stage data yet 🌸</div></div>
+    {% endif %}
+
+    <p class="privacy-note">🔒 All data is completely anonymous. No patient names, conversations or personal information is stored or shown.</p>
+</body>
+</html>
+"""
 
 @app.route("/")
 def home():
     return render_template("index.html")
+
+@app.route("/validate-code", methods=["POST"])
+def validate_code():
+    data = request.json
+    code = data.get("code", "").strip().upper()
+    if code in CLINIC_CODES:
+        clinic_info = CLINIC_CODES[code]
+        print(f"\n🏥 CLINIC USER: {clinic_info['clinic']} ({clinic_info['country']})")
+        return jsonify({"valid": True, "clinic": clinic_info["clinic"], "country": clinic_info["country"], "code": code})
+    else:
+        return jsonify({"valid": False})
 
 @app.route("/chat", methods=["POST"])
 def chat():
@@ -26,19 +151,39 @@ def chat():
     stage = data.get("stage", "preparing")
     mood = data.get("mood", "")
     history = data.get("history", [])
+    is_clinic_user = data.get("is_clinic_user", False)
+    clinic_code = data.get("clinic_code", "")
+    message_count_today = data.get("message_count_today", 0)
 
-    # Track real human messages
+    if not is_clinic_user and message_count_today >= FREE_DAILY_LIMIT:
+        return jsonify({"reply": None, "limit_reached": True})
+
     stats["total_messages"] += 1
+
+    # Track clinic stats
+    if is_clinic_user and clinic_code in clinic_stats:
+        clinic_stats[clinic_code]["messages"] += 1
+        if len(history) <= 1:
+            clinic_stats[clinic_code]["patients"] += 1
+        if mood:
+            clinic_stats[clinic_code]["moods"][mood] = clinic_stats[clinic_code]["moods"].get(mood, 0) + 1
+        if stage:
+            clinic_stats[clinic_code]["stages"][stage] = clinic_stats[clinic_code]["stages"].get(stage, 0) + 1
+
     if len(history) <= 1:
         stats["total_conversations"] += 1
+        if is_clinic_user:
+            stats["clinic_users"] += 1
+        else:
+            stats["free_users"] += 1
         print(f"\n{'='*50}")
         print(f"🌸 NEW REAL USER CONVERSATION STARTED")
         print(f"Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-        print(f"Stage: {stage}")
-        print(f"Mood: {mood}")
-        print(f"Total conversations so far: {stats['total_conversations']}")
+        print(f"Stage: {stage} | Mood: {mood}")
+        print(f"Type: {'Clinic User ✅ ' + clinic_code if is_clinic_user else 'Free User'}")
+        print(f"Total conversations: {stats['total_conversations']}")
         print(f"{'='*50}\n")
-    
+
     print(f"💬 REAL USER MESSAGE #{stats['total_messages']}: {user_message[:50]}...")
 
     stage_context = {
@@ -82,7 +227,6 @@ STRICT RULES:
 You are the friend at 2am who actually listens. That is your only job."""
 
     messages = [{"role": "system", "content": system_prompt}]
-
     for msg in (history[-10:] if len(history) > 10 else history):
         messages.append(msg)
 
@@ -93,23 +237,78 @@ You are the friend at 2am who actually listens. That is your only job."""
     )
 
     reply = response.choices[0].message.content
-    return jsonify({"reply": reply})
+    return jsonify({
+        "reply": reply,
+        "limit_reached": False,
+        "messages_remaining": FREE_DAILY_LIMIT - message_count_today - 1 if not is_clinic_user else 999
+    })
 
 @app.route("/feedback", methods=["POST"])
 def feedback():
     data = request.json
     feedback_type = data.get("feedback", "")
+    clinic_code = data.get("clinic_code", "")
     if feedback_type == "helpful":
         stats["helpful_feedback"] += 1
+        if clinic_code in clinic_stats:
+            clinic_stats[clinic_code]["helpful"] += 1
     else:
         stats["not_helpful_feedback"] += 1
-    print(f"\n⭐ FEEDBACK RECEIVED: {feedback_type}")
-    print(f"Total helpful: {stats['helpful_feedback']} | Not helpful: {stats['not_helpful_feedback']}\n")
+    print(f"\n⭐ FEEDBACK: {feedback_type}\n")
     return jsonify({"status": "ok"})
+
+@app.route("/clinic-dashboard/<code>")
+def clinic_dashboard(code):
+    code = code.upper()
+    admin_key = request.args.get("key", "")
+    if admin_key != os.environ.get("ADMIN_KEY", "bloom-admin-2026"):
+        return "Unauthorized — please contact Bloom support", 401
+
+    if code not in CLINIC_CODES:
+        return "Invalid clinic code", 404
+
+    clinic_info = CLINIC_CODES[code]
+    data = clinic_stats.get(code, {"patients": 0, "messages": 0, "moods": {}, "stages": {}, "helpful": 0})
+
+    avg_messages = round(data["messages"] / data["patients"], 1) if data["patients"] > 0 else 0
+
+    top_moods = sorted(data["moods"].items(), key=lambda x: x[1], reverse=True)[:5]
+    max_mood = max([c for _, c in top_moods], default=1)
+
+    stage_labels = {
+        "preparing": "Preparing",
+        "stimulation": "Stimulation",
+        "retrieval": "Egg Retrieval",
+        "transfer": "Transfer",
+        "tww": "Two-Week Wait",
+        "results": "Results",
+        "failed": "Failed Cycle"
+    }
+    top_stages = [(stage_labels.get(s, s), c) for s, c in sorted(data["stages"].items(), key=lambda x: x[1], reverse=True)[:5]]
+    max_stage = max([c for _, c in top_stages], default=1)
+
+    return render_template_string(CLINIC_DASHBOARD,
+        clinic_name=clinic_info["clinic"],
+        country=clinic_info["country"],
+        code=code,
+        data=data,
+        avg_messages=avg_messages,
+        top_moods=top_moods,
+        max_mood=max_mood,
+        top_stages=top_stages,
+        max_stage=max_stage
+    )
 
 @app.route("/stats")
 def show_stats():
     return jsonify(stats)
+
+@app.route("/admin")
+def admin():
+    password = request.args.get("key", "")
+    if password != os.environ.get("ADMIN_KEY", "bloom-admin-2026"):
+        return "Unauthorized", 401
+    return jsonify({"stats": stats, "clinic_stats": clinic_stats, "active_codes": CLINIC_CODES})
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=8080, debug=True)
