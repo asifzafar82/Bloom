@@ -48,7 +48,7 @@ async function validateCode() {
 
 function startFreeChat() {
     isClinicUser = false;
-    messageCountToday = parseInt(localStorage.getItem('bloom_msg_count_' + today()) || '0');
+    messageCountToday = parseInt(localStorage.getItem('zunara_msg_count_' + today()) || '0');
     document.getElementById('welcomeScreen').style.display = 'none';
     startApp();
 }
@@ -121,6 +121,7 @@ async function sendMessage() {
                 mood: selectedMood,
                 history: conversationHistory,
                 is_clinic_user: isClinicUser,
+                clinic_code: isClinicUser ? document.getElementById('codeInput')?.value?.trim()?.toUpperCase() : '',
                 message_count_today: messageCountToday
             })
         });
@@ -139,9 +140,8 @@ async function sendMessage() {
             messageCount++;
             messageCountToday++;
 
-            // Save count for free users
             if (!isClinicUser) {
-                localStorage.setItem('bloom_msg_count_' + today(), messageCountToday);
+                localStorage.setItem('zunara_msg_count_' + today(), messageCountToday);
                 const remaining = FREE_DAILY_LIMIT - messageCountToday;
                 document.getElementById('accessBadge').textContent = `🆓 ${remaining} messages left today`;
                 if (remaining <= 0) showUpgradePrompt();
