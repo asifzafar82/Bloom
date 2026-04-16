@@ -12,6 +12,7 @@
     <title>Bloom - IVF Support Companion</title>
     <link rel="stylesheet" href="/static/style.css">
     <style>
+        /* ===== ONBOARDING ===== */
         #onboarding {
             position: fixed;
             inset: 0;
@@ -57,14 +58,237 @@
         .ob-skip-top { position: absolute; top: 16px; right: 20px; font-size: 12px; color: #ccc; cursor: pointer; background: none; border: none; }
         .ob-slide { display: none; }
         .ob-slide.active { display: block; }
+
+        /* ===== EMAIL CAPTURE MODAL ===== */
+        #emailCaptureModal {
+            position: fixed;
+            inset: 0;
+            z-index: 99999;
+            display: flex;
+            align-items: flex-end;
+            justify-content: center;
+            padding: 16px;
+            background: rgba(136,14,79,0.15);
+            backdrop-filter: blur(8px);
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.4s ease;
+        }
+        #emailCaptureModal.visible { opacity: 1; pointer-events: all; }
+        .email-card {
+            background: white;
+            border-radius: 28px;
+            width: 100%;
+            max-width: 420px;
+            padding: 32px 28px 28px;
+            box-shadow: 0 -8px 60px rgba(233,30,140,0.2), 0 4px 40px rgba(0,0,0,0.12);
+            transform: translateY(60px);
+            transition: transform 0.5s cubic-bezier(0.34,1.56,0.64,1);
+            position: relative;
+            overflow: hidden;
+            margin-bottom: 8px;
+        }
+        #emailCaptureModal.visible .email-card { transform: translateY(0); }
+        .email-card::before {
+            content: '';
+            position: absolute;
+            top: -40px; right: -40px;
+            width: 160px; height: 160px;
+            background: radial-gradient(circle, rgba(233,30,140,0.08) 0%, transparent 70%);
+            border-radius: 50%;
+            pointer-events: none;
+        }
+        .email-card-close {
+            position: absolute; top: 16px; right: 20px;
+            background: #f5f5f5; border: none; border-radius: 50%;
+            width: 32px; height: 32px; font-size: 14px; color: #999; cursor: pointer;
+        }
+        .email-heart { font-size: 48px; text-align: center; margin-bottom: 12px; display: block; animation: heartbeat 2s ease infinite; }
+        @keyframes heartbeat { 0%,100%{transform:scale(1)} 50%{transform:scale(1.08)} }
+        .email-card h2 { font-size: 22px; color: #880e4f; text-align: center; margin-bottom: 8px; line-height: 1.3; font-weight: 700; }
+        .email-card > div > p { font-size: 13px; color: #777; text-align: center; line-height: 1.7; margin-bottom: 20px; }
+        .email-card > div > p strong { color: #e91e8c; }
+        .email-benefits { list-style: none; margin-bottom: 20px; background: #fff8fb; border-radius: 14px; padding: 14px 16px; }
+        .email-benefits li { font-size: 13px; color: #555; padding: 6px 0; display: flex; align-items: center; gap: 10px; border-bottom: 1px solid #fce4ec; }
+        .email-benefits li:last-child { border-bottom: none; }
+        .email-input-wrapper { position: relative; margin-bottom: 12px; }
+        .email-input-wrapper input, .name-input-wrapper input {
+            width: 100%; padding: 14px 16px 14px 44px;
+            border: 2px solid #f48fb1; border-radius: 14px;
+            font-size: 15px; color: #333; outline: none;
+            transition: border-color 0.2s; background: white; font-family: inherit;
+        }
+        .email-input-wrapper input:focus, .name-input-wrapper input:focus { border-color: #e91e8c; }
+        .email-input-wrapper input::placeholder, .name-input-wrapper input::placeholder { color: #ccc; }
+        .email-input-icon, .name-input-icon { position: absolute; left: 14px; top: 50%; transform: translateY(-50%); font-size: 18px; pointer-events: none; }
+        .name-input-wrapper { position: relative; margin-bottom: 12px; }
+        .name-input-wrapper input { padding: 12px 16px 12px 44px; }
+        .email-submit-btn {
+            width: 100%; padding: 16px;
+            background: linear-gradient(135deg, #e91e8c, #880e4f);
+            color: white; border: none; border-radius: 14px;
+            font-size: 16px; font-weight: 600; cursor: pointer; margin-bottom: 10px;
+            box-shadow: 0 4px 20px rgba(233,30,140,0.3); font-family: inherit;
+        }
+        .email-skip-btn { width: 100%; padding: 10px; background: none; border: none; color: #ccc; font-size: 12px; cursor: pointer; font-family: inherit; }
+        .email-privacy { text-align: center; font-size: 11px; color: #bbb; margin-top: 8px; }
+        .email-error { color: #e53935; font-size: 12px; text-align: center; margin-top: -8px; margin-bottom: 8px; display: none; }
+        .email-success { display: none; text-align: center; padding: 16px 0; }
+        .email-success-icon { font-size: 56px; display: block; margin-bottom: 12px; animation: popIn 0.5s cubic-bezier(0.34,1.56,0.64,1); }
+        @keyframes popIn { from{transform:scale(0);opacity:0} to{transform:scale(1);opacity:1} }
+        .email-success h3 { color: #880e4f; font-size: 20px; margin-bottom: 8px; }
+        .email-success p { color: #888; font-size: 13px; line-height: 1.6; }
+
+        /* ===== DAILY CHECK-IN BANNER ===== */
+        #dailyCheckin {
+            display: none;
+            position: fixed; top: 0; left: 0; right: 0; z-index: 9998;
+            padding: 12px 16px;
+            background: linear-gradient(135deg, #880e4f, #e91e8c);
+            color: white; font-size: 13px; text-align: center;
+            cursor: pointer; box-shadow: 0 4px 20px rgba(233,30,140,0.3);
+            animation: slideDown 0.4s ease;
+        }
+        @keyframes slideDown { from{transform:translateY(-100%)} to{transform:translateY(0)} }
+        #dailyCheckin p { margin: 0; font-weight: 500; }
+        #dailyCheckin span { font-size: 11px; opacity: 0.85; display: block; margin-top: 2px; }
+
+        /* ===== QUICK CHECK-IN MODAL ===== */
+        #quickCheckinModal {
+            position: fixed; inset: 0; z-index: 99998;
+            display: flex; align-items: center; justify-content: center; padding: 20px;
+            background: rgba(136,14,79,0.12); backdrop-filter: blur(6px);
+            opacity: 0; pointer-events: none; transition: opacity 0.3s ease;
+        }
+        #quickCheckinModal.visible { opacity: 1; pointer-events: all; }
+        .checkin-card {
+            background: white; border-radius: 24px; width: 100%; max-width: 360px; padding: 28px 24px;
+            box-shadow: 0 8px 40px rgba(233,30,140,0.2);
+            transform: scale(0.92); transition: transform 0.4s cubic-bezier(0.34,1.56,0.64,1);
+        }
+        #quickCheckinModal.visible .checkin-card { transform: scale(1); }
+        .checkin-card h3 { color: #880e4f; font-size: 20px; text-align: center; margin-bottom: 6px; }
+        .checkin-card > p { color: #888; font-size: 13px; text-align: center; margin-bottom: 20px; line-height: 1.5; }
+        .checkin-moods { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 16px; }
+        .checkin-mood-btn {
+            padding: 14px 8px; border: 2px solid #f48fb1; border-radius: 14px;
+            background: white; color: #ad1457; font-size: 13px; font-family: inherit;
+            font-weight: 500; cursor: pointer; text-align: center; transition: all 0.2s;
+        }
+        .checkin-mood-btn.selected, .checkin-mood-btn:hover { background: #e91e8c; color: white; border-color: #e91e8c; }
+        .checkin-talk-btn {
+            width: 100%; padding: 14px;
+            background: linear-gradient(135deg, #e91e8c, #880e4f);
+            color: white; border: none; border-radius: 14px;
+            font-size: 15px; font-weight: 600; font-family: inherit; cursor: pointer; margin-bottom: 8px;
+        }
+        .checkin-dismiss-btn { width: 100%; padding: 8px; background: none; border: none; color: #ccc; font-size: 12px; font-family: inherit; cursor: pointer; }
+
+        /* ===== RETURN GREETING ===== */
+        #returnGreeting {
+            display: none;
+            background: linear-gradient(135deg, #fce4ec, #f8bbd0);
+            border-radius: 16px; padding: 16px 20px; margin-bottom: 16px;
+            width: 100%; max-width: 480px; position: relative; overflow: hidden;
+            border: 1px solid rgba(233,30,140,0.15);
+        }
+        #returnGreeting::before { content:'🌸'; position:absolute; right:16px; top:50%; transform:translateY(-50%); font-size:32px; opacity:0.3; }
+        #returnGreeting h3 { color: #880e4f; font-size: 16px; margin-bottom: 4px; }
+        #returnGreeting p { color: #ad1457; font-size: 13px; line-height: 1.5; }
+
+        /* ===== STREAK ===== */
+        #streakDisplay {
+            display: none;
+            background: white; border-radius: 16px; padding: 12px 20px;
+            margin-bottom: 16px; width: 100%; max-width: 480px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.08);
+            align-items: center; gap: 12px;
+        }
+        .streak-flame { font-size: 28px; animation: flicker 1.5s ease infinite alternate; }
+        @keyframes flicker { from{transform:scale(1) rotate(-3deg)} to{transform:scale(1.05) rotate(3deg)} }
+        .streak-info h4 { color: #880e4f; font-size: 15px; margin-bottom: 2px; }
+        .streak-info p { color: #ad1457; font-size: 12px; }
+
+        /* ===== PWA PROMPT ===== */
+        #pwaPrompt {
+            display: none;
+            background: white; border-radius: 16px; padding: 16px 20px;
+            margin-bottom: 16px; width: 100%; max-width: 480px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.08); border: 1px solid #fce4ec;
+        }
+        #pwaPrompt p { color: #880e4f; font-size: 13px; margin-bottom: 10px; font-weight: 500; }
+        #pwaPrompt span { font-size: 12px; color: #999; font-weight: 400; }
+        .pwa-btn { background: #e91e8c; color: white; border: none; border-radius: 10px; padding: 8px 16px; font-size: 13px; font-family: inherit; cursor: pointer; margin-right: 8px; }
+        .pwa-dismiss { background: none; border: none; color: #ccc; font-size: 12px; font-family: inherit; cursor: pointer; }
     </style>
 </head>
 <body>
 
+    <!-- ===== DAILY CHECK-IN BANNER (top of page) ===== -->
+    <div id="dailyCheckin" onclick="openDailyCheckin()">
+        <p>🌸 Welcome back. How are you feeling today?</p>
+        <span>Tap to do your 30-second daily check-in →</span>
+    </div>
+
+    <!-- ===== EMAIL CAPTURE MODAL ===== -->
+    <div id="emailCaptureModal">
+        <div class="email-card">
+            <button class="email-card-close" onclick="dismissEmailCapture()">✕</button>
+            <div id="emailFormState">
+                <span class="email-heart">💌</span>
+                <h2>Stay connected with Bloom</h2>
+                <p>You've been so brave sharing today. Let Bloom <strong>check in on you</strong> — so you're never alone in this journey.</p>
+                <ul class="email-benefits">
+                    <li>🌅 Daily gentle check-in — just for you</li>
+                    <li>💡 Stage-specific support when you need it</li>
+                    <li>🌸 A reminder that you're not alone</li>
+                    <li>🔒 No spam. Unsubscribe anytime.</li>
+                </ul>
+                <div class="name-input-wrapper">
+                    <span class="name-input-icon">🌸</span>
+                    <input type="text" id="emailNameInput" placeholder="Your first name (optional)" />
+                </div>
+                <div class="email-input-wrapper">
+                    <span class="email-input-icon">✉️</span>
+                    <input type="email" id="emailAddressInput" placeholder="your@email.com" />
+                </div>
+                <div class="email-error" id="emailError">Please enter a valid email address 💕</div>
+                <button class="email-submit-btn" onclick="submitEmail()">Yes, keep me connected 🌸</button>
+                <button class="email-skip-btn" onclick="dismissEmailCapture()">Maybe later</button>
+                <p class="email-privacy">🔒 100% private. We never share your email.</p>
+            </div>
+            <div class="email-success" id="emailSuccessState">
+                <span class="email-success-icon">🌸</span>
+                <h3>You're not alone anymore</h3>
+                <p>We'll check in on you gently. No pressure, no noise — just Bloom, whenever you need us. 💕</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===== QUICK CHECK-IN MODAL ===== -->
+    <div id="quickCheckinModal">
+        <div class="checkin-card">
+            <h3>How are you today? 🌸</h3>
+            <p>Just one tap. No pressure. Bloom wants to know.</p>
+            <div class="checkin-moods">
+                <button class="checkin-mood-btn" onclick="selectCheckinMood(this, '😰 Anxious')">😰 Anxious</button>
+                <button class="checkin-mood-btn" onclick="selectCheckinMood(this, '😢 Sad')">😢 Sad</button>
+                <button class="checkin-mood-btn" onclick="selectCheckinMood(this, '😤 Frustrated')">😤 Frustrated</button>
+                <button class="checkin-mood-btn" onclick="selectCheckinMood(this, '😶 Numb')">😶 Numb</button>
+                <button class="checkin-mood-btn" onclick="selectCheckinMood(this, '🙂 Hopeful')">🙂 Hopeful</button>
+                <button class="checkin-mood-btn" onclick="selectCheckinMood(this, '😴 Exhausted')">😴 Exhausted</button>
+                <button class="checkin-mood-btn" onclick="selectCheckinMood(this, '😌 Calm')">😌 Calm</button>
+                <button class="checkin-mood-btn" onclick="selectCheckinMood(this, '💪 Strong')">💪 Strong</button>
+            </div>
+            <button class="checkin-talk-btn" onclick="startCheckinChat()">Talk to Bloom about it 💬</button>
+            <button class="checkin-dismiss-btn" onclick="dismissCheckin()">I'm okay for now</button>
+        </div>
+    </div>
+
+    <!-- ===== ONBOARDING ===== -->
     <div id="onboarding">
         <div class="ob-card">
             <button class="ob-skip-top" onclick="skipOnboarding()">Skip</button>
-
             <div class="ob-slide active" id="ob-slide-1">
                 <div class="ob-dots"><div class="ob-dot active"></div><div class="ob-dot"></div><div class="ob-dot"></div><div class="ob-dot"></div><div class="ob-dot"></div></div>
                 <div class="ob-illustration">💛</div>
@@ -78,7 +302,6 @@
                 <div class="ob-warning">⚠️ If you are experiencing a medical or mental health emergency, please contact your doctor or a crisis helpline immediately.</div>
                 <button class="ob-btn-primary" onclick="obNext(2)">I understand, continue →</button>
             </div>
-
             <div class="ob-slide" id="ob-slide-2">
                 <div class="ob-dots"><div class="ob-dot"></div><div class="ob-dot active"></div><div class="ob-dot"></div><div class="ob-dot"></div><div class="ob-dot"></div></div>
                 <div class="ob-illustration">🌸</div>
@@ -88,7 +311,6 @@
                 <button class="ob-btn-primary" onclick="obNext(3)">Get Started →</button>
                 <button class="ob-btn-skip" onclick="skipOnboarding()">I'll explore on my own</button>
             </div>
-
             <div class="ob-slide" id="ob-slide-3">
                 <div class="ob-dots"><div class="ob-dot"></div><div class="ob-dot"></div><div class="ob-dot active"></div><div class="ob-dot"></div><div class="ob-dot"></div></div>
                 <div class="ob-illustration">💬</div>
@@ -101,7 +323,6 @@
                 </ul>
                 <button class="ob-btn-primary" onclick="obNext(4)">Next →</button>
             </div>
-
             <div class="ob-slide" id="ob-slide-4">
                 <div class="ob-dots"><div class="ob-dot"></div><div class="ob-dot"></div><div class="ob-dot"></div><div class="ob-dot active"></div><div class="ob-dot"></div></div>
                 <div class="ob-illustration">✨</div>
@@ -115,7 +336,6 @@
                 </ul>
                 <button class="ob-btn-primary" onclick="obNext(5)">Next →</button>
             </div>
-
             <div class="ob-slide" id="ob-slide-5">
                 <div class="ob-dots"><div class="ob-dot"></div><div class="ob-dot"></div><div class="ob-dot"></div><div class="ob-dot"></div><div class="ob-dot active"></div></div>
                 <div class="ob-illustration">🏥</div>
@@ -131,6 +351,7 @@
         </div>
     </div>
 
+    <!-- ===== WELCOME SCREEN ===== -->
     <div id="welcomeScreen" style="display:none">
         <div class="welcome-box">
             <div class="welcome-logo">🌸</div>
@@ -148,6 +369,7 @@
         </div>
     </div>
 
+    <!-- ===== CODE SCREEN ===== -->
     <div id="codeScreen" style="display:none">
         <div class="welcome-box">
             <div class="welcome-logo">🏥</div>
@@ -160,6 +382,7 @@
         </div>
     </div>
 
+    <!-- ===== MAIN APP ===== -->
     <div id="mainApp" style="display:none">
         <div class="header">
             <h1>🌸 Bloom</h1>
@@ -171,12 +394,36 @@
             <span id="accessBadge">🆓 Free</span>
             <span>🌸 Built for IVF</span>
         </div>
+
+        <!-- ✅ NEW: Return greeting (shows on 2nd+ visit) -->
+        <div id="returnGreeting">
+            <h3 id="returnGreetingTitle">Welcome back 🌸</h3>
+            <p id="returnGreetingText">It's good to see you again. How are you holding up?</p>
+        </div>
+
+        <!-- ✅ NEW: Streak display (shows after 2+ days) -->
+        <div id="streakDisplay">
+            <span class="streak-flame">🔥</span>
+            <div class="streak-info">
+                <h4 id="streakTitle">2 days with Bloom</h4>
+                <p id="streakSubtitle">You came back. That means everything. 💕</p>
+            </div>
+        </div>
+
+        <!-- ✅ NEW: PWA install prompt -->
+        <div id="pwaPrompt">
+            <p>📱 Add Bloom to your home screen <span>— one tap away, always</span></p>
+            <button class="pwa-btn" onclick="installPWA()">Add to Home Screen</button>
+            <button class="pwa-dismiss" onclick="dismissPWA()">Not now</button>
+        </div>
+
         <div class="tab-nav">
             <button class="tab-btn active" onclick="showTab('chatTab', this)">💬 Talk</button>
             <button class="tab-btn" onclick="showTab('exercisesTab', this)">🧘 Calm</button>
             <button class="tab-btn" onclick="showTab('affirmationsTab', this)">✨ Affirm</button>
             <button class="tab-btn" onclick="showTab('journalTab', this)">📓 Journal</button>
         </div>
+
         <div id="chatTab" class="tab-content">
             <div class="stage-selector">
                 <label>📍 Where are you in your IVF journey?</label>
@@ -226,6 +473,7 @@
                 <div id="feedbackThanks" style="display:none"><p>Thank you! Your feedback helps us improve 🌸</p></div>
             </div>
         </div>
+
         <div id="exercisesTab" class="tab-content" style="display:none">
             <div class="section-title">🧘 Calming Exercises</div>
             <p class="section-desc">Choose an exercise to help you feel calmer right now</p>
@@ -242,6 +490,7 @@
                 </div>
             </div>
         </div>
+
         <div id="affirmationsTab" class="tab-content" style="display:none">
             <div class="section-title">✨ Daily Affirmations</div>
             <p class="section-desc">Words of strength for your IVF journey</p>
@@ -250,6 +499,7 @@
                 <button class="affirmation-btn" onclick="newAffirmation()">New Affirmation 🌸</button>
             </div>
         </div>
+
         <div id="journalTab" class="tab-content" style="display:none">
             <div class="section-title">📓 Today's Journal</div>
             <p class="section-desc">Write freely — this is your private space</p>
@@ -267,7 +517,6 @@
             const t = document.getElementById('ob-slide-' + n);
             if (t) t.classList.add('active');
         }
-
         function skipOnboarding() {
             localStorage.setItem('bloom_onboarded', 'true');
             const ob = document.getElementById('onboarding');
@@ -278,7 +527,6 @@
                 document.getElementById('welcomeScreen').style.display = 'flex';
             }, 300);
         }
-
         window.addEventListener('DOMContentLoaded', () => {
             if (localStorage.getItem('bloom_onboarded') === 'true') {
                 document.getElementById('onboarding').style.display = 'none';
@@ -287,4 +535,4 @@
         });
     </script>
 </body>
-                                                                                                    </html>
+</html>
