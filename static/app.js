@@ -9,7 +9,7 @@ let currentStep = 0;
 let selectedCheckinMood = '';
 let deferredPWAPrompt = null;
 
-const FREE_DAILY_LIMIT = 5;
+const FREE_DAILY_LIMIT = 50;
 
 // ===== PWA INSTALL LISTENER =====
 window.addEventListener('beforeinstallprompt', (e) => {
