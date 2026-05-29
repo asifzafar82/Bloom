@@ -190,6 +190,20 @@ CLINIC_DASHBOARD = """
 
 # --- Routes ---
 
+@app.route("/health")
+def health():
+    """Health check endpoint with API key validation"""
+    groq_key = os.environ.get("GROQ_API_KEY", "").strip()
+    supabase_url = os.environ.get("SUPABASE_URL", "").strip()
+    supabase_key = os.environ.get("SUPABASE_KEY", "").strip()
+    
+    return jsonify({
+        "status": "healthy",
+        "groq_api_configured": bool(groq_key and groq_key != "dummy-key-for-testing"),
+        "supabase_configured": bool(supabase_url and supabase_key),
+        "timestamp": datetime.now().isoformat()
+    })
+
 @app.route("/")
 def home():
     return render_template("index.html")
@@ -295,13 +309,17 @@ Make them feel less alone. Not by pretending it's going to be okay. But by witne
     for msg in (history[-10:] if len(history) > 10 else history):
         messages.append(msg)
 
-    response = client.chat.completions.create(
-        model="llama-3.3-70b-versatile",
-        max_tokens=300,
-        messages=messages
-    )
+    try:
+        response = client.chat.completions.create(
+            model="llama-3.3-70b-versatile",
+            max_tokens=300,
+            messages=messages
+        )
+        reply = response.choices[0].message.content
+    except Exception as groq_error:
+        print(f"\n❌ GROQ API ERROR: {str(groq_error)}")
+        reply = "I'm having trouble connecting right now, but I'm still here for you. Take a breath. Your feelings matter. 💕"
 
-    reply = response.choices[0].message.content
     return jsonify({
         "reply": reply,
         "limit_reached": False,
