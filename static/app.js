@@ -43,6 +43,7 @@ async function validateCode() {
 
         if (data.valid) {
             isClinicUser = true;
+            clinicCode = data.code || code;
             clinicName = data.clinic;
             document.getElementById('codeScreen').style.display = 'none';
             startApp();
@@ -56,7 +57,7 @@ async function validateCode() {
 
 function startFreeChat() {
     isClinicUser = false;
-    messageCountToday = parseInt(localStorage.getItem('bloom_msg_count_v2_' + today())
+    messageCountToday = parseInt(localStorage.getItem('bloom_msg_count_v2_' + today()) || '0', 10) || 0;
     document.getElementById('welcomeScreen').style.display = 'none';
     startApp();
 }
@@ -132,6 +133,7 @@ async function sendMessage() {
                 mood: selectedMood,
                 history: conversationHistory,
                 is_clinic_user: isClinicUser,
+                clinic_code: clinicCode,
                 message_count_today: messageCountToday
             })
         });
@@ -152,7 +154,7 @@ async function sendMessage() {
 
             // Save count for free users
             if (!isClinicUser) {
-                localStorage.setItem('bloom_msg_count_v2_' + today(), messageCountToday)
+                localStorage.setItem('bloom_msg_count_v2_' + today(), messageCountToday);
                 const remaining = FREE_DAILY_LIMIT - messageCountToday;
                 document.getElementById('accessBadge').textContent = `🆓 ${remaining} messages left today`;
                 if (remaining <= 0) showUpgradePrompt();
@@ -191,7 +193,7 @@ function sendFeedback(type) {
     fetch('/feedback', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ feedback: type })
+        body: JSON.stringify({ feedback: type, clinic_code: clinicCode })
     });
 }
 
