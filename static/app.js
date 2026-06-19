@@ -2,6 +2,7 @@ let selectedMood = "";
 let conversationHistory = [];
 let messageCount = 0;
 let isClinicUser = false;
+let clinicCode = "";
 let clinicName = "";
 let messageCountToday = 0;
 let currentExercise = [];
