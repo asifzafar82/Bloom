@@ -143,6 +143,10 @@ async function sendMessage() {
         document.getElementById('typing').style.display = 'none';
 
         if (data.limit_reached) {
+            if (!isClinicUser) {
+                messageCountToday = FREE_DAILY_LIMIT;
+                localStorage.setItem('bloom_msg_count_v2_' + today(), messageCountToday);
+            }
             showUpgradePrompt();
             return;
         }
@@ -151,10 +155,16 @@ async function sendMessage() {
             addMessage(data.reply, 'bot');
             conversationHistory.push({ role: "assistant", content: data.reply });
             messageCount++;
-            messageCountToday++;
 
-            // Save count for free users
+            // Free-tier counting is enforced server-side now (localStorage is only
+            // a display cache). Sync to whatever the server says is actually left
+            // so the badge can't drift from real usage across devices/incognito/clears.
             if (!isClinicUser) {
+                if (typeof data.messages_remaining === 'number') {
+                    messageCountToday = FREE_DAILY_LIMIT - data.messages_remaining;
+                } else {
+                    messageCountToday++;
+                }
                 localStorage.setItem('bloom_msg_count_v2_' + today(), messageCountToday);
                 const remaining = FREE_DAILY_LIMIT - messageCountToday;
                 document.getElementById('accessBadge').textContent = `🆓 ${remaining} messages left today`;
