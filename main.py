@@ -1,18 +1,50 @@
 from flask import Flask, request, jsonify, render_template, render_template_string
 import os
+import sys
+import logging
+import hashlib
+from urllib.parse import quote
 from groq import Groq
-from datetime import datetime
-import json
+from datetime import datetime, timezone
 import requests as http_requests
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
+
+# --- Logging ---
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s %(levelname)s %(message)s"
+)
+logger = logging.getLogger("bloom")
+
+# --- Required configuration (fail fast instead of falling back to
+#     hardcoded/public defaults) ---
+REQUIRED_ENV_VARS = ["SECRET_KEY", "GROQ_API_KEY", "SUPABASE_URL", "SUPABASE_KEY", "ADMIN_KEY"]
+missing = [name for name in REQUIRED_ENV_VARS if not os.environ.get(name)]
+if missing:
+    logger.error(f"Missing required environment variables: {', '.join(missing)}")
+    sys.exit(
+        "Startup aborted: the following environment variables must be set "
+        f"(no defaults are used for secrets): {', '.join(missing)}"
+    )
 
 app = Flask(__name__)
-app.secret_key = os.environ.get("SECRET_KEY", "zunara-secret-2026")
+app.secret_key = os.environ["SECRET_KEY"]
 
-client = Groq(api_key=os.environ.get("GROQ_API_KEY"))
+client = Groq(api_key=os.environ["GROQ_API_KEY"])
 
-# Supabase config
-SUPABASE_URL = os.environ.get("SUPABASE_URL", "https://qtdncxiqkzsqwqbolvjw.supabase.co")
-SUPABASE_KEY = os.environ.get("SUPABASE_KEY", "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF0ZG5jeGlxa3pzcXdxYm9sdmp3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ2MzU5OTMsImV4cCI6MjA5MDIxMTk5M30.ZV5DGtZMWIDwKPGibY0y_zUXY6rKuZFKLzYolKurtcA")
+# Supabase config — no hardcoded fallback. If these aren't set, the app
+# refuses to start (see REQUIRED_ENV_VARS check above).
+SUPABASE_URL = os.environ["SUPABASE_URL"]
+SUPABASE_KEY = os.environ["SUPABASE_KEY"]
+ADMIN_KEY = os.environ["ADMIN_KEY"]
+
+limiter = Limiter(
+    get_remote_address,
+    app=app,
+    default_limits=["200 per hour"],
+    storage_uri="memory://",
+)
 
 def get_headers():
     return {
@@ -21,6 +53,11 @@ def get_headers():
         "Content-Type": "application/json",
         "Prefer": "return=representation"
     }
+
+def hashed_ip():
+    """Hash the caller's IP so we can key daily usage without storing raw IPs."""
+    ip = get_remote_address()
+    return hashlib.sha256(ip.encode()).hexdigest()[:32]
 
 FREE_DAILY_LIMIT = 50
 
@@ -35,7 +72,7 @@ def db_get_stats():
             return data[0]
         return {}
     except Exception as e:
-        print(f"Error getting stats: {e}")
+        logger.error(f"Error getting stats: {e}")
         return {}
 
 def db_increment_stats(field, amount=1):
@@ -45,7 +82,7 @@ def db_increment_stats(field, amount=1):
         url = f"{SUPABASE_URL}/rest/v1/stats?id=eq.global"
         http_requests.patch(url, headers=get_headers(), json={field: new_val}, timeout=10)
     except Exception as e:
-        print(f"Error incrementing stats: {e}")
+        logger.error(f"Error incrementing stats: {e}")
 
 def db_get_clinic_codes():
     try:
@@ -61,19 +98,19 @@ def db_get_clinic_codes():
                 }
         return codes
     except Exception as e:
-        print(f"Error getting clinic codes: {e}")
+        logger.error(f"Error getting clinic codes: {e}")
         return {}
 
 def db_get_clinic_stats(code):
     try:
-        url = f"{SUPABASE_URL}/rest/v1/clinic_stats?code=eq.{code}&select=*"
+        url = f"{SUPABASE_URL}/rest/v1/clinic_stats?code=eq.{quote(code, safe='')}&select=*"
         r = http_requests.get(url, headers=get_headers(), timeout=10)
         data = r.json()
         if isinstance(data, list) and len(data) > 0:
             return data[0]
         return {"patients": 0, "messages": 0, "helpful": 0, "moods": {}, "stages": {}}
     except Exception as e:
-        print(f"Error getting clinic stats: {e}")
+        logger.error(f"Error getting clinic stats: {e}")
         return {"patients": 0, "messages": 0, "helpful": 0, "moods": {}, "stages": {}}
 
 def db_update_clinic_stats(code, patients_inc=0, messages_inc=1, mood=None, stage=None, helpful_inc=0):
@@ -94,10 +131,39 @@ def db_update_clinic_stats(code, patients_inc=0, messages_inc=1, mood=None, stag
         if stage:
             new_data["stages"][stage] = new_data["stages"].get(stage, 0) + 1
 
-        url = f"{SUPABASE_URL}/rest/v1/clinic_stats?code=eq.{code}"
+        url = f"{SUPABASE_URL}/rest/v1/clinic_stats?code=eq.{quote(code, safe='')}"
         http_requests.patch(url, headers=get_headers(), json=new_data, timeout=10)
     except Exception as e:
-        print(f"Error updating clinic stats: {e}")
+        logger.error(f"Error updating clinic stats: {e}")
+
+def db_get_daily_usage(ip_hash, day):
+    """Server-side, tamper-proof count of free-tier messages used today by this caller."""
+    try:
+        url = f"{SUPABASE_URL}/rest/v1/daily_usage?ip_hash=eq.{quote(ip_hash, safe='')}&usage_date=eq.{day}&select=*"
+        r = http_requests.get(url, headers=get_headers(), timeout=10)
+        data = r.json()
+        if isinstance(data, list) and len(data) > 0:
+            return data[0].get("count", 0)
+        return 0
+    except Exception as e:
+        logger.error(f"Error getting daily usage: {e}")
+        # Fail closed on the free tier: if we can't verify usage, don't grant unlimited messages.
+        return FREE_DAILY_LIMIT
+
+def db_increment_daily_usage(ip_hash, day):
+    try:
+        url = f"{SUPABASE_URL}/rest/v1/daily_usage"
+        headers = get_headers()
+        headers["Prefer"] = "resolution=merge-duplicates,return=representation"
+        current = db_get_daily_usage(ip_hash, day)
+        http_requests.post(
+            url,
+            headers=headers,
+            json={"ip_hash": ip_hash, "usage_date": day, "count": current + 1},
+            timeout=10
+        )
+    except Exception as e:
+        logger.error(f"Error incrementing daily usage: {e}")
 
 # --- Clinic Dashboard HTML ---
 
@@ -209,29 +275,38 @@ def home():
     return render_template("index.html")
 
 @app.route("/validate-code", methods=["POST"])
+@limiter.limit("20 per minute")
 def validate_code():
-    data = request.json
+    data = request.get_json(silent=True) or {}
     code = data.get("code", "").strip().upper()
     clinic_codes = db_get_clinic_codes()
     if code in clinic_codes:
         clinic_info = clinic_codes[code]
-        print(f"\n🏥 CLINIC USER: {clinic_info['clinic']} ({clinic_info['country']})")
+        logger.info(f"Clinic user validated: {clinic_info['clinic']} ({clinic_info['country']})")
         return jsonify({"valid": True, "clinic": clinic_info["clinic"], "country": clinic_info["country"], "code": code})
     return jsonify({"valid": False})
 
 @app.route("/chat", methods=["POST"])
+@limiter.limit("20 per minute")
 def chat():
-    data = request.json
+    data = request.get_json(silent=True) or {}
     user_message = data.get("message", "")
     stage = data.get("stage", "preparing")
     mood = data.get("mood", "")
     history = data.get("history", [])
     is_clinic_user = data.get("is_clinic_user", False)
     clinic_code = data.get("clinic_code", "")
-    message_count_today = data.get("message_count_today", 0)
 
-    if not is_clinic_user and message_count_today >= FREE_DAILY_LIMIT:
-        return jsonify({"reply": None, "limit_reached": True})
+    # Free-tier limit is enforced server-side, keyed on a hashed IP + date.
+    # We do NOT trust the client-supplied message_count_today for enforcement
+    # (it lives in localStorage and can be reset/spoofed trivially); it's still
+    # accepted above for backwards compatibility but ignored for limit checks.
+    today_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    caller_hash = hashed_ip()
+    if not is_clinic_user:
+        usage_today = db_get_daily_usage(caller_hash, today_str)
+        if usage_today >= FREE_DAILY_LIMIT:
+            return jsonify({"reply": None, "limit_reached": True})
 
     db_increment_stats("total_messages")
     is_new_conversation = len(history) <= 1
@@ -242,7 +317,7 @@ def chat():
             db_increment_stats("clinic_users")
         else:
             db_increment_stats("free_users")
-        print(f"\n NEW CONVERSATION | Stage: {stage} | Mood: {mood} | Type: {'Clinic: ' + clinic_code if is_clinic_user else 'Free'}")
+        logger.info(f"New conversation | stage={stage} | mood={mood} | type={'clinic:' + clinic_code if is_clinic_user else 'free'}")
 
     if is_clinic_user and clinic_code:
         db_update_clinic_stats(
@@ -317,29 +392,36 @@ Make them feel less alone. Not by pretending it's going to be okay. But by witne
         )
         reply = response.choices[0].message.content
     except Exception as groq_error:
-        print(f"\n❌ GROQ API ERROR: {str(groq_error)}")
+        logger.error(f"Groq API error: {groq_error}")
         reply = "I'm having trouble connecting right now, but I'm still here for you. Take a breath. Your feelings matter. 💕"
+
+    messages_remaining = 999
+    if not is_clinic_user:
+        db_increment_daily_usage(caller_hash, today_str)
+        messages_remaining = max(0, FREE_DAILY_LIMIT - (usage_today + 1))
 
     return jsonify({
         "reply": reply,
         "limit_reached": False,
-        "messages_remaining": FREE_DAILY_LIMIT - message_count_today - 1 if not is_clinic_user else 999
+        "messages_remaining": messages_remaining
     })
 
 @app.route("/save-email", methods=["POST"])
+@limiter.limit("10 per minute")
 def save_email():
-    data = request.json or {}
+    data = request.get_json(silent=True) or {}
     email = data.get("email", "")
     name = data.get("name", "")
     stage = data.get("stage", "")
     source = data.get("source", "")
     if email:
-        print(f"\nEMAIL CAPTURE: {email} | name={name} | stage={stage} | source={source}\n")
+        logger.info(f"Email capture | name={name} | stage={stage} | source={source}")
     return jsonify({"status": "ok"})
 
 @app.route("/feedback", methods=["POST"])
+@limiter.limit("30 per minute")
 def feedback():
-    data = request.json
+    data = request.get_json(silent=True) or {}
     feedback_type = data.get("feedback", "")
     clinic_code = data.get("clinic_code", "")
     if feedback_type == "helpful":
@@ -348,15 +430,15 @@ def feedback():
             db_update_clinic_stats(clinic_code, messages_inc=0, helpful_inc=1)
     else:
         db_increment_stats("not_helpful_feedback")
-    print(f"\n FEEDBACK: {feedback_type}\n")
+    logger.info(f"Feedback received: {feedback_type}")
     return jsonify({"status": "ok"})
 
 @app.route("/clinic-dashboard/<code>")
 def clinic_dashboard(code):
     code = code.upper()
     admin_key = request.args.get("key", "")
-    if admin_key != os.environ.get("ADMIN_KEY", "zunara-admin-2026"):
-        return "Unauthorized — please contact Zunara support", 401
+    if admin_key != ADMIN_KEY:
+        return "Unauthorized — please contact Bloom support", 401
 
     clinic_codes = db_get_clinic_codes()
     if code not in clinic_codes:
@@ -391,12 +473,15 @@ def clinic_dashboard(code):
 
 @app.route("/stats")
 def show_stats():
+    # Gated: aggregate usage numbers are still business data (growth, conversion),
+    # not just harmless debug output — don't leave this open to the public.
+    if request.args.get("key", "") != ADMIN_KEY:
+        return "Unauthorized", 401
     return jsonify(db_get_stats())
 
 @app.route("/admin")
 def admin():
-    password = request.args.get("key", "")
-    if password != os.environ.get("ADMIN_KEY", "Bloom-admin-2026"):
+    if request.args.get("key", "") != ADMIN_KEY:
         return "Unauthorized", 401
     return jsonify({
         "stats": db_get_stats(),
@@ -405,4 +490,5 @@ def admin():
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
-    app.run(host="0.0.0.0", port=port, debug=True)
+    debug_mode = os.environ.get("FLASK_DEBUG", "false").lower() == "true"
+    app.run(host="0.0.0.0", port=port, debug=debug_mode)
